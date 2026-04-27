@@ -1,0 +1,6 @@
+ticker,weight,sector,region
+AAPL,0.28,Technology,US
+MSFT,0.22,Technology,US
+NVDA,0.18,Semiconductor,US
+SPY,0.20,Broad Market,US
+TLT,0.12,Bond,US

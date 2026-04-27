@@ -1,0 +1,6 @@
+date,ticker,side,quantity,price
+2026-01-02,AAPL,buy,10,180
+2026-01-05,AAPL,buy,5,174
+2026-01-10,AAPL,sell,6,188
+2026-01-12,MSFT,buy,3,410
+2026-01-20,MSFT,sell,1,425
