@@ -93,6 +93,31 @@
 `insight.unknown.safe_summary`: "본 결과는 투자 권유가 아니라 입력 데이터 기반 요약입니다." 만 출력.
 
 ## 표본 한계 안내
+## 리서치팀 검증 질문 대응
+
+| 검증 질문 | Insight skill의 답변 |
+| --- | --- |
+| 인사이트가 투자 추천으로 오해될 수 있나? | Safety Charter가 모든 템플릿보다 우선하며 추천·보장·명령형 문장을 금지한다. |
+| LLM이 매번 다른 문장을 만들지 않나? | 모든 문장은 deterministic template이며 외부 LLM/API를 호출하지 않는다. |
+| 위험보다 긍정 문구가 먼저 나오지 않나? | 위험 → 변동성·규모 → 추세 → 활동 → 한계 안내 순서로 정렬한다. |
+| 작은 표본도 단정하나? | 행 수·결측 조건에 따라 표본 한계 문장을 추가한다. |
+| unknown도 억지 해석하나? | `unknown`은 안전 요약과 추천 컬럼 안내만 제공하고 투자 판단 문장은 생성하지 않는다. |
+
+### Insight-to-layout handoff
+
+```yaml
+insights:
+  - <위험 또는 한계 문장 우선>
+  - <지표 관찰 문장>
+  - "본 결과는 투자 권유가 아니라 입력 데이터 기반 요약입니다."
+trace[3]:
+  skillId: 04_insight_generation
+  ruleId: insight.<type>.*
+  evidence: <임계값 또는 표본 조건>
+```
+
+Layout skill은 이 배열을 Insights 탭과 핵심 인사이트 영역에 배치한다. 안전 disclaimer는 footer와 insight text 양쪽에서 반복되어야 한다.
+
 
 행 수가 작거나 결측이 많으면 **모든 인사이트 뒤에 한 줄을 덧붙인다.**
 

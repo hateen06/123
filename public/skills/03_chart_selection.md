@@ -74,6 +74,29 @@ chart:
 
 `reason`은 화면의 차트 카드 헤더에 그대로 노출된다. 평가자가 "왜 이 차트가 선택됐는가"를 즉시 확인할 수 있어야 한다.
 
+## 리서치팀 검증 질문 대응
+
+| 검증 질문 | Chart skill의 답변 | 대시보드 증거 |
+| --- | --- | --- |
+| 차트가 예뻐 보이려고 임의 선택된 것 아닌가? | `data_type`과 `riskVisual.kind`에 따라 chart catalog에서 deterministic하게 선택한다. | chart reason, trace step 03 |
+| 위험이 차트 속에 묻히지 않는가? | main chart와 risk visual을 분리해 drawdown/concentration/buy_sell 위험을 별도 카드로 표시한다. | risk visual 영역 |
+| unknown CSV에 잘못된 차트를 그리지 않는가? | `unknown`은 `table_preview`만 허용하고 해석 차트는 금지한다. | data preview 중심 화면 |
+| 색상이 금융 의미를 왜곡하지 않는가? | 거래 방향 색상과 수익률 부호 표현을 분리하고 semantic token만 사용한다. | buy/sell meter, KPI tone |
+
+### Chart-to-layout handoff
+
+```yaml
+chartReason: <왜 이 차트가 선택됐는지 한국어 설명>
+series: <차트 렌더링용 정규화 데이터>
+riskVisual:
+  kind: drawdown | concentration | buy_sell | none
+trace[2]:
+  skillId: 03_chart_selection
+  ruleId: chart.<type>.*
+```
+
+Layout skill은 이 handoff를 받아 main visualization과 risk visual을 배치한다. 따라서 03번 스킬의 출력은 "차트 종류"뿐 아니라 **왜 그 차트가 선택됐는지 설명하는 증거**를 포함해야 한다.
+
 ## 한계와 의도된 비대응
 
 - **상관계수 매트릭스/히트맵 미지원**: 다중 자산 비교 유형 미구현에 따른 결과

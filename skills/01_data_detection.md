@@ -128,6 +128,34 @@ reasons:
 
 `reasons`는 **사용자에게 보여주기 위한 한국어 사유 문자열**이며, 화면의 "판별 근거" 영역에 그대로 노출된다.
 
+## 리서치팀 검증 질문 대응
+
+이 스킬은 평가자가 처음 물을 법한 "왜 이 CSV를 이 유형이라고 판단했는가?"에 답해야 한다. 따라서 판별 결과는 단순 label이 아니라 **근거가 남는 audit record**여야 한다.
+
+| 검증 질문 | 답변 규칙 | 화면/trace 증거 |
+| --- | --- | --- |
+| 한국어 컬럼도 처리하는가? | 정규화 후 alias 표로 `일자`, `종가`, `평가비중`, `매매`, `체결가` 등을 canonical column에 매핑한다. | column mapping note |
+| price와 market indicator가 둘 다 `date + value`면 어떻게 구분하는가? | OHLCV 보조 컬럼이 있으면 `price_timeseries`, 없으면 단일 지표인 `market_indicator`로 낮은 confidence 판별한다. | confidence, reasons |
+| 샘플 3개만 맞춘 것 아닌가? | `ticker/weight`, `date/side/quantity/price`, `date/close/OHLCV` 같은 구조 신호를 기준으로 하며 파일명은 사용하지 않는다. | `reasons`에 컬럼 기반 증거만 표시 |
+| 애매한 CSV를 억지로 분석하지 않는가? | 신뢰도 임계 미달 시 `unknown`으로 보내고 후속 단계는 diagnostic/table preview만 사용한다. | `detect.unknown.fallback` trace |
+| 판별 결과가 다음 단계에 어떻게 전달되는가? | `data_type`, `mapped_columns`, `confidence`, `reasons`만 Metric skill의 입력으로 넘긴다. | trace step 01 output |
+
+### Dashboard generation handoff
+
+01번 스킬이 성공하면 Layout은 다음 데이터를 화면 상단과 trace에 바인딩한다.
+
+```yaml
+detection_badge: <data_type>
+confidence_badge: round(confidence * 100)
+column_mapping_note: mapped_columns
+trace[0]:
+  skillId: 01_data_detection
+  ruleId: detect.<type>.*
+  evidence: reasons
+```
+
+이 handoff가 비어 있으면 뒤 단계의 KPI/차트가 맞더라도 "Skills 기반 생성" 증거가 부족하므로 실패로 본다.
+
 ## 한계와 의도된 비대응
 
 이 문서는 다음 케이스를 의도적으로 다루지 않는다.

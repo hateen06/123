@@ -52,6 +52,58 @@
 
 즉, 평가자가 다른 데이터를 같은 화면 패턴으로 비교할 수 있다.
 
+## 심사위원·Codex Research Team 예상 질문에 대한 선제 답변
+
+이 대회의 핵심 평가는 "멋진 화면"이 아니라 **Skills.md가 실제 분석·시각화·리포트 생성을 얼마나 명확하게 지시하고, 그 결과가 대시보드에 검증 가능하게 드러나는가**라고 본다. 따라서 본 contract는 아래 질문에 답하도록 설계한다.
+
+| 예상 질문 | Skills.md의 답변 | 대시보드에서 확인할 증거 |
+| --- | --- | --- |
+| 이 화면은 그냥 하드코딩된 샘플 대시보드 아닌가? | CSV → Detection → Metric → Chart → Insight → Layout의 5단계 rule pipeline을 고정하고, 각 단계가 `trace.ruleId`를 출력한다. | `Skills Trace`, `Rule Ledger`, `Trace ↔ Skills contract` 배지 |
+| Skills.md가 실제 코드와 연결되어 있나? | 모든 implemented rule은 root matrix, 개별 skill 문서, `IMPLEMENTED_RULE_CATALOG`, UI trace에 같은 Rule ID로 존재해야 한다. | matched/unmatched rule contract 표시 |
+| 왜 이 CSV가 이 유형으로 판별됐나? | 01번 스킬이 alias, 필수 신호, confidence, mapped column, reasons를 정의한다. | Detection badge, column mapping note, 판별 근거 |
+| 왜 이 KPI가 계산됐나? | 02번 스킬이 data_type별 공식과 tone을 정의하고 KPI slot에 연결한다. | 4개 KPI 카드, generated report summary |
+| 왜 이 차트가 선택됐나? | 03번 스킬이 data_type별 main chart와 risk visual을 결정한다. | chart reason 문구, risk visual 영역 |
+| 인사이트가 투자 조언처럼 보이지 않나? | 04번 스킬의 Safety Charter가 모든 문장보다 우선하며 추천/보장/단정을 금지한다. | Insights 탭과 footer disclaimer |
+| 대시보드 레이아웃도 Skills의 결과인가? | 05번 스킬이 KPI/차트/trace/tabs/footer의 정보 위계와 슬롯 규칙을 정의한다. | 화면 섹션 순서와 responsive layout |
+| 지원하지 않는 CSV는 어떻게 하나? | `unknown` fallback은 숨기지 않고 diagnostic, 추천 컬럼, table preview만 제공한다. | unknown 상태의 warnings와 data preview |
+
+## Skills-to-Dashboard 생성 계약
+
+각 skill은 다음 산출물을 만들고, Layout skill은 이를 화면 슬롯에 배치한다. 이 표는 평가자가 "Skills.md를 따라 실제 대시보드가 생성됐는지" 확인하기 위한 감사 기준이다.
+
+| Skill | 필수 산출물 | Dashboard binding | 실패 시 동작 |
+| --- | --- | --- | --- |
+| 01 Detection | `dataType`, `confidence`, `mapped`, `reasons` | 상단 데이터 유형 배지, column mapping note | `unknown` + 추천 컬럼 안내 |
+| 02 Metric | `kpis`, `riskVisual`, `reportSections` seed | KPI grid, generated report summary, risk visual | 숫자 경고를 warnings에 노출 |
+| 03 Chart | `chartReason`, `series`, `riskVisual.kind` | main chart card, risk visual card | chart 대신 table preview |
+| 04 Insight | deterministic Korean `insights` | Insights tab, 우측 핵심 인사이트 | safety disclaimer만 유지 |
+| 05 Layout | `trace`, section order, responsive slots | 전체 화면 구조, tabs, footer | footer와 diagnostic은 항상 렌더 |
+
+### Trace proof invariant
+
+대시보드에 표시되는 하나의 분석 결과는 항상 5개 trace step을 가져야 한다.
+
+```yaml
+trace:
+  - step: "01"
+    skillId: "01_data_detection"
+    ruleId: "detect.*"
+  - step: "02"
+    skillId: "02_metric_rules"
+    ruleId: "metric.*"
+  - step: "03"
+    skillId: "03_chart_selection"
+    ruleId: "chart.*"
+  - step: "04"
+    skillId: "04_insight_generation"
+    ruleId: "insight.*"
+  - step: "05"
+    skillId: "05_report_layout"
+    ruleId: "layout.*"
+```
+
+이 invariant가 깨지면 "Skills.md 기반 자동 대시보드"라는 제출 명제가 약해지므로, UI는 unmatched rule을 숨기지 않고 표시해야 한다.
+
 ## 통합 구현 매트릭스
 
 본 데모 빌드에서 실제로 동작하는 모든 규칙은 다음과 같다. 각 규칙 ID는 **(a) 정의된 .md 위치**, **(b) 코드의 trace 출력**, **(c) UI의 가시 증거** 셋이 모두 존재해야 한다.

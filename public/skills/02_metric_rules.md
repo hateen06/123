@@ -116,6 +116,28 @@ report_sections:
 | `warn` | 주의 필요 | secondary |
 | `bad` | 부정/위험 | destructive |
 
+## 대시보드 생성 binding
+
+Metric skill의 결과는 단순 수치 계산에서 끝나지 않고, Layout skill이 그대로 화면에 배치할 수 있는 구조로 나와야 한다.
+
+| 산출물 | 생성 기준 | 화면 위치 | 심사 포인트 |
+| --- | --- | --- | --- |
+| `kpis[0..3]` | 데이터 유형별 핵심 4개를 우선 정렬 | KPI Grid | 다른 CSV도 같은 슬롯 의미 유지 |
+| `kpis[4..]` | 상세 보조 지표 | Detail/summary 영역 | 자동 리포트 풍부화 |
+| `riskVisual` | drawdown/concentration/buy_sell/none 중 하나 | chart 아래 risk card | 위험을 수익보다 숨기지 않음 |
+| `reportSections` | 핵심 요약, 위험 포인트, 생성된 화면, 규칙 정합 | generated report summary | Skills가 만든 dashboard라는 증거 |
+| `warnings` | 숫자 변환·결측·정규화 문제 | diagnostic/warning 영역 | 데이터 품질 문제를 숨기지 않음 |
+
+## 리서치팀 검증 질문 대응
+
+| 검증 질문 | Metric skill의 답변 |
+| --- | --- |
+| KPI가 임의로 고른 숫자인가? | 각 `data_type`별 공식과 화면 사용처를 이 문서에 고정하고, trace step 02에 계산 evidence를 남긴다. |
+| 위험 지표가 별도로 보이는가? | 모든 supported type은 `riskVisual`을 만들거나 `none` 사유를 명시한다. |
+| 같은 CSV를 다시 넣으면 같은 값이 나오는가? | 외부 API/LLM 없이 deterministic formula만 사용한다. |
+| 단위가 섞이면 어떻게 하나? | 콤마, 퍼센트, 음수 부호 정규화 정책을 먼저 적용하고 변환 실패는 warning으로 노출한다. |
+| transaction_log에서 손익을 말하지 않는 이유는? | 매수·매도 매칭과 수수료/세금 정보가 없으므로 실현 손익은 future rule로 분리한다. |
+
 ## 한계와 의도된 비대응
 
 - **벤치마크 비교 미수행**: 코스피/S&P 등 외부 시리즈 미참조

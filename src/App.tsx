@@ -117,7 +117,7 @@ function VolumeStrip({ series }: { series: any[] }) {
   if (!hasVolume) return null;
   const totalVolume = series.reduce((a, s) => a + Number(s.volume || 0), 0);
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border bg-muted/20 p-3">
+    <div className="flex flex-col gap-1.5 rounded-lg bg-muted/20 p-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">일별 거래량</span>
         <span className="text-[11px] tabular-nums text-muted-foreground">합계 {totalVolume.toLocaleString()}</span>
@@ -145,7 +145,7 @@ function VolumeStrip({ series }: { series: any[] }) {
 function RiskPanel({ risk, series }: { risk: RiskVisual; series: any[] }) {
   if (risk.kind === 'drawdown') {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-4">
+      <div className="flex flex-col gap-2 rounded-lg bg-muted/30 p-4">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium text-muted-foreground">{risk.label}</span>
           <span className="text-base font-semibold tabular-nums text-destructive">
@@ -182,7 +182,7 @@ function RiskPanel({ risk, series }: { risk: RiskVisual; series: any[] }) {
   if (risk.kind === 'concentration') {
     const pctValue = Math.min(100, Math.max(0, risk.value * 100));
     return (
-      <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-4">
+      <div className="flex flex-col gap-2 rounded-lg bg-muted/30 p-4">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium text-muted-foreground">{risk.label}</span>
           <span className="text-base font-semibold tabular-nums">{pctValue.toFixed(1)}%</span>
@@ -211,12 +211,12 @@ function RiskPanel({ risk, series }: { risk: RiskVisual; series: any[] }) {
     const buyPct = (risk.buy / total) * 100;
     const sellPct = (risk.sell / total) * 100;
     return (
-      <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-4">
+      <div className="flex flex-col gap-2 rounded-lg bg-muted/30 p-4">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium text-muted-foreground">{risk.label}</span>
           <span className="text-base font-semibold tabular-nums">{risk.ratio.toFixed(2)}x</span>
         </div>
-        <div className="flex h-6 w-full overflow-hidden rounded-md border bg-muted text-[11px] font-medium">
+        <div className="flex h-6 w-full overflow-hidden rounded-md bg-muted text-[11px] font-medium">
           <span className="flex items-center justify-center bg-foreground text-background" style={{ width: `${buyPct}%` }}>
             Buy {buyPct.toFixed(0)}%
           </span>
@@ -230,8 +230,14 @@ function RiskPanel({ risk, series }: { risk: RiskVisual; series: any[] }) {
   }
 
   return (
-    <div className="rounded-lg border bg-muted/30 p-4 text-xs text-muted-foreground">{risk.helper}</div>
+    <div className="rounded-lg bg-muted/30 p-4 text-xs text-muted-foreground">{risk.helper}</div>
   );
+}
+
+function compactDateTick(value: unknown) {
+  const parts = String(value ?? '').split('-');
+  if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
+  return String(value ?? '');
 }
 
 function MainChart({ analysis, series }: { analysis: Analysis; series: any[] }) {
@@ -241,20 +247,29 @@ function MainChart({ analysis, series }: { analysis: Analysis; series: any[] }) 
     return (
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={series} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-          <XAxis dataKey="date" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} stroke="var(--border)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="transparent" />
+          <XAxis
+            dataKey="date"
+            tickFormatter={compactDateTick}
+            interval="preserveStartEnd"
+            minTickGap={42}
+            tickMargin={10}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }}
+          />
           <YAxis
             yAxisId="price"
             domain={['dataMin - 3', 'dataMax + 3']}
             tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
-            stroke="var(--border)"
+            stroke="transparent"
           />
           <YAxis
             yAxisId="return"
             orientation="right"
             tickFormatter={v => `${v}%`}
             tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
-            stroke="var(--border)"
+            stroke="transparent"
           />
           <Tooltip
             contentStyle={{
@@ -264,7 +279,17 @@ function MainChart({ analysis, series }: { analysis: Analysis; series: any[] }) 
               fontSize: 12,
             }}
           />
-          <Legend iconType="circle" wrapperStyle={{ fontSize: 12, color: 'var(--muted-foreground)' }} />
+          <Legend
+            verticalAlign="top"
+            align="right"
+            iconType="line"
+            iconSize={12}
+            wrapperStyle={{
+              fontSize: 11,
+              color: 'var(--muted-foreground)',
+              paddingBottom: 10,
+            }}
+          />
           <Line
             yAxisId="price"
             name={isPrice ? '종가' : '지표값'}
@@ -313,9 +338,9 @@ function MainChart({ analysis, series }: { analysis: Analysis; series: any[] }) 
   return (
     <ResponsiveContainer width="100%" height={320}>
       <BarChart data={series} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-        <XAxis dataKey="name" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} stroke="var(--border)" />
-        <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} stroke="var(--border)" />
+        <CartesianGrid strokeDasharray="3 3" stroke="transparent" />
+        <XAxis dataKey="name" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} tickLine={false} axisLine={false} stroke="transparent" />
+        <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} tickLine={false} axisLine={false} stroke="transparent" />
         <Tooltip
           contentStyle={{
             borderRadius: 8,
@@ -424,6 +449,16 @@ export default function App() {
   const warnings = [...parseState.warnings, ...(analysis?.warnings ?? [])].filter((v, i, arr) => arr.indexOf(v) === i);
   const unsupported = analysis?.detection.dataType === 'unknown';
   const showDiagnostic = parseState.errors.length > 0 || warnings.length > 0 || unsupported;
+  const primaryKpis = analysis?.kpis.slice(0, 4) ?? [];
+  const secondaryKpis = analysis?.kpis.slice(4) ?? [];
+  const proofStats = analysis
+    ? [
+        { label: 'Detected', value: detectionLabel(analysis.detection.dataType), detail: `${confidence}% confidence` },
+        { label: 'Skills run', value: `${analysis.trace.length} steps`, detail: analysis.trace.map(t => t.step).join(' → ') },
+        { label: 'Rule contract', value: `${contract?.matched.length ?? 0}/${analysis.trace.length}`, detail: contract?.unmatched.length ? 'needs review' : 'all matched' },
+        { label: 'Dashboard', value: 'Generated', detail: 'KPI · chart · insight · trace' },
+      ]
+    : [];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -530,34 +565,84 @@ export default function App() {
 
         {analysis && (
           <>
-            <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {analysis.kpis.map(k => (
-                <Card key={k.label}>
-                  <CardHeader className="gap-1 pb-2">
-                    <CardDescription className="text-[11px]">{k.label}</CardDescription>
-                    <CardTitle className="text-xl tabular-nums">{k.value}</CardTitle>
+            <section className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+              {primaryKpis.map((k, idx) => (
+                <Card
+                  key={k.label}
+                  className={cn(
+                    'overflow-hidden border-foreground/15 shadow-sm',
+                    idx === 0
+                      ? 'bg-foreground text-background'
+                      : 'bg-card ring-1 ring-foreground/10',
+                    k.tone === 'bad' && 'border-destructive/40 ring-destructive/20',
+                  )}
+                >
+                  <CardHeader className="gap-2 pb-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardDescription className={cn('text-xs font-medium', idx === 0 && 'text-background/70')}>
+                        {k.label}
+                      </CardDescription>
+                      <Badge
+                        variant={idx === 0 ? 'secondary' : toneVariant(k.tone)}
+                        className="text-[10px] uppercase tracking-wide"
+                      >
+                        {k.tone === 'good'
+                          ? 'positive'
+                          : k.tone === 'bad'
+                            ? 'negative'
+                            : k.tone === 'warn'
+                              ? 'watch'
+                              : 'neutral'}
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-3xl font-semibold tracking-tight tabular-nums md:text-4xl">
+                      {k.value}
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-0">
-                    <Badge variant={toneVariant(k.tone)} className="text-[10px]">
-                      {k.tone === 'good'
-                        ? 'positive'
-                        : k.tone === 'bad'
-                          ? 'negative'
-                          : k.tone === 'warn'
-                            ? 'watch'
-                            : 'neutral'}
-                    </Badge>
-                  </CardContent>
                 </Card>
               ))}
             </section>
 
+            <section className="grid grid-cols-1 gap-3 rounded-xl border bg-muted/25 p-3 md:grid-cols-4">
+              {proofStats.map(stat => (
+                <div key={stat.label} className="flex flex-col gap-1 rounded-lg border bg-background p-3">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{stat.label}</span>
+                  <strong className="text-sm tabular-nums">{stat.value}</strong>
+                  <span className="text-[11px] text-muted-foreground">{stat.detail}</span>
+                </div>
+              ))}
+            </section>
+
+            {secondaryKpis.length > 0 && (
+              <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {secondaryKpis.map(k => (
+                  <Card key={k.label} className="bg-card/70">
+                    <CardHeader className="gap-1 pb-2">
+                      <CardDescription className="text-[11px]">{k.label}</CardDescription>
+                      <CardTitle className="text-xl tabular-nums">{k.value}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <Badge variant={toneVariant(k.tone)} className="text-[10px]">
+                        {k.tone === 'good'
+                          ? 'positive'
+                          : k.tone === 'bad'
+                            ? 'negative'
+                            : k.tone === 'warn'
+                              ? 'watch'
+                              : 'neutral'}
+                      </Badge>
+                    </CardContent>
+                  </Card>
+                ))}
+              </section>
+            )}
+
             <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              <Card className="lg:col-span-2">
+              <Card className="bg-transparent shadow-none ring-0 lg:col-span-2">
                 <CardHeader className="flex-row items-start justify-between gap-4">
                   <div className="flex flex-col gap-1">
-                    <CardDescription>자동 시각화</CardDescription>
-                    <CardTitle>{analysis.chartReason}</CardTitle>
+                    <CardDescription>근거 확인용 시각화</CardDescription>
+                    <CardTitle className="text-base text-muted-foreground">{analysis.chartReason}</CardTitle>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
                     <Badge variant="outline" className="font-mono text-[11px]">{mode}</Badge>
@@ -572,26 +657,26 @@ export default function App() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="bg-transparent shadow-none ring-0">
                 <CardHeader>
-                  <CardDescription>분석 요약</CardDescription>
-                  <CardTitle>한눈에 보기</CardTitle>
+                  <CardDescription>보조 분석 요약</CardDescription>
+                  <CardTitle>근거와 리스크</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4 text-sm">
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="flex flex-col gap-0.5 rounded-md border bg-muted/30 p-2.5">
+                    <div className="flex flex-col gap-0.5 rounded-md bg-muted/30 p-2.5">
                       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">분석 기간</span>
                       <strong className="text-xs tabular-nums">{periodLabel}</strong>
                     </div>
-                    <div className="flex flex-col gap-0.5 rounded-md border bg-muted/30 p-2.5">
+                    <div className="flex flex-col gap-0.5 rounded-md bg-muted/30 p-2.5">
                       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">데이터 수</span>
                       <strong className="text-xs tabular-nums">{rows.length.toLocaleString()} rows</strong>
                     </div>
-                    <div className="flex flex-col gap-0.5 rounded-md border bg-muted/30 p-2.5">
+                    <div className="flex flex-col gap-0.5 rounded-md bg-muted/30 p-2.5">
                       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">분석 모드</span>
                       <strong className="text-xs">{mode}</strong>
                     </div>
-                    <div className="flex flex-col gap-0.5 rounded-md border bg-muted/30 p-2.5">
+                    <div className="flex flex-col gap-0.5 rounded-md bg-muted/30 p-2.5">
                       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">마지막 실행</span>
                       <strong className="text-xs tabular-nums">{formatTime(lastRunAt)}</strong>
                     </div>

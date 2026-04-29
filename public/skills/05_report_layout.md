@@ -96,6 +96,31 @@ KPI 4 슬롯은 데이터 유형과 무관하게 **항상 같은 의미**를 가
 footer는 어떤 상황에서도 **반드시 렌더**되어야 한다. 데이터 미입력 / 에러 / unknown 상태에서도 동일.
 
 ## 인터랙션 규칙
+## Skills-to-screen proof map
+
+이 스킬은 앞선 4개 skill이 만든 산출물을 "심사위원이 30초 안에 검증 가능한 화면"으로 바꾸는 최종 조립 규칙이다.
+
+| 화면 영역 | 입력 skill | 표시해야 하는 증거 | 실패 시 리스크 |
+| --- | --- | --- | --- |
+| Data Source Bar | 01 Detection | data type, confidence, sample/upload state | 샘플 하드코딩처럼 보임 |
+| KPI Grid | 02 Metric | 공통 슬롯 4개, tone | 분석 기준 일관성 약화 |
+| Main Chart | 03 Chart | chart reason, normalized series | 차트 선택 근거 부재 |
+| Risk Visual | 02/03 Metric+Chart | drawdown/concentration/buy_sell | 위험 은폐처럼 보임 |
+| Generated Report Summary | 02/04 Metric+Insight | 핵심 요약, 위험 포인트, 규칙 정합 | Skills가 리포트를 만든 증거 부족 |
+| Skills Trace | 01~05 전체 | 5-step rule id timeline | Skills.md와 코드 연결 불명확 |
+| Rule Ledger | 01~05 전체 | matched/unmatched contract | 구현 범위 검증 불가 |
+| Footer | 04 Insight | 투자 유의사항 | 자문/추천 오해 |
+
+## 리서치팀 검증 질문 대응
+
+| 검증 질문 | Layout skill의 답변 |
+| --- | --- |
+| 대시보드가 Skills 결과물이라는 증거가 첫 화면에 보이나? | KPI, generated report, chart reason, trace contract를 같은 화면 흐름에 배치한다. |
+| 왜 이 정보 순서인가? | 위험과 판별 근거를 수익/마케팅 문구보다 먼저 확인할 수 있게 evidence-first hierarchy를 사용한다. |
+| 모바일에서 심사 가능할까? | KPI 2열, chart/contract 1열 적층, 390px no horizontal scroll을 기준으로 한다. |
+| 구현 범위를 과장하지 않나? | 미구현 future rules는 Rule Ledger에 올리지 않고 확장 절에만 둔다. |
+| 안전 문구가 항상 보이나? | footer disclaimer는 정상/unknown/error 상태에서 항상 렌더되어야 한다. |
+
 
 - Tabs 전환은 클라이언트 상태로만 처리 (URL hash 변경 없음)
 - 차트 hover tooltip은 활성, 클릭 드릴다운은 미사용 (현재 범위)
