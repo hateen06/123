@@ -14,12 +14,24 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { analyze, Analysis, buildRuleContract, Row, RiskVisual, validateRows } from './lib/analysis';
+import { ArrowUpRight, BookOpen, FileUp, Sparkles, Upload } from 'lucide-react';
+import { analyze, Analysis, buildRuleContract, Row, RiskVisual, validateRows } from '@/lib/analysis';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+import { SkillsInspector, SkillId } from '@/components/skills-inspector';
 
 const samples = [
-  ['주가 시계열', '/samples/price_timeseries.csv', '가격 추세와 누적 수익률'],
-  ['포트폴리오 비중', '/samples/portfolio_allocation.csv', '자산별 집중도와 비중'],
-  ['거래내역', '/samples/transaction_log.csv', '매수·매도 규모와 빈도'],
+  { label: '주가 시계열', url: '/samples/price_timeseries.csv', desc: '가격 추세와 누적 수익률' },
+  { label: '포트폴리오 비중', url: '/samples/portfolio_allocation.csv', desc: '자산별 집중도와 비중' },
+  { label: '거래내역', url: '/samples/transaction_log.csv', desc: '매수·매도 규모와 빈도' },
 ] as const;
 
 type ParseState = {
@@ -80,11 +92,11 @@ function detectionLabel(type?: string) {
   return 'Unsupported';
 }
 
-function toneLabel(tone?: string) {
-  if (tone === 'good') return 'positive';
-  if (tone === 'bad') return 'negative';
-  if (tone === 'warn') return 'watch';
-  return 'neutral';
+function toneVariant(tone?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+  if (tone === 'bad') return 'destructive';
+  if (tone === 'warn') return 'secondary';
+  if (tone === 'good') return 'default';
+  return 'outline';
 }
 
 function focusMode(query: string) {
@@ -100,29 +112,69 @@ function formatTime(date?: Date | null) {
   return new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(date);
 }
 
-function RiskVisualPanel({ risk, series }: { risk: RiskVisual; series: any[] }) {
+function VolumeStrip({ series }: { series: any[] }) {
+  const hasVolume = series.some(s => Number(s.volume) > 0);
+  if (!hasVolume) return null;
+  const totalVolume = series.reduce((a, s) => a + Number(s.volume || 0), 0);
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border bg-muted/20 p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">일별 거래량</span>
+        <span className="text-[11px] tabular-nums text-muted-foreground">합계 {totalVolume.toLocaleString()}</span>
+      </div>
+      <ResponsiveContainer width="100%" height={56}>
+        <BarChart data={series} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
+          <XAxis dataKey="date" hide />
+          <YAxis hide />
+          <Tooltip
+            contentStyle={{
+              borderRadius: 8,
+              border: '1px solid var(--border)',
+              background: 'var(--popover)',
+              fontSize: 12,
+            }}
+            formatter={(v) => Number(v).toLocaleString()}
+          />
+          <Bar dataKey="volume" fill="var(--chart-3)" radius={[2, 2, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function RiskPanel({ risk, series }: { risk: RiskVisual; series: any[] }) {
   if (risk.kind === 'drawdown') {
     return (
-      <div className="risk-visual">
-        <div className="risk-head">
-          <span>{risk.label}</span>
-          <strong>{(risk.value * 100).toFixed(2)}%</strong>
+      <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-muted-foreground">{risk.label}</span>
+          <span className="text-base font-semibold tabular-nums text-destructive">
+            {(risk.value * 100).toFixed(2)}%
+          </span>
         </div>
-        <ResponsiveContainer width="100%" height={92}>
-          <AreaChart data={series} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+        <ResponsiveContainer width="100%" height={64}>
+          <AreaChart data={series} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
             <defs>
-              <linearGradient id="drawdownFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.38} />
-                <stop offset="95%" stopColor="#ef4444" stopOpacity={0.04} />
+              <linearGradient id="ddFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--destructive)" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="var(--destructive)" stopOpacity={0.04} />
               </linearGradient>
             </defs>
             <YAxis hide domain={['dataMin - 1', 0]} />
             <XAxis hide dataKey="date" />
-            <Tooltip formatter={(v) => `${Number(v).toFixed(2)}%`} labelStyle={{ color: '#111' }} />
-            <Area type="monotone" dataKey="drawdownPct" stroke="#ef4444" fill="url(#drawdownFill)" strokeWidth={2} />
+            <Tooltip
+              formatter={(v) => `${Number(v).toFixed(2)}%`}
+              contentStyle={{
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+                background: 'var(--popover)',
+                fontSize: 12,
+              }}
+            />
+            <Area type="monotone" dataKey="drawdownPct" stroke="var(--destructive)" fill="url(#ddFill)" strokeWidth={1.5} />
           </AreaChart>
         </ResponsiveContainer>
-        <p>{risk.helper}</p>
+        <p className="text-xs text-muted-foreground">{risk.helper}</p>
       </div>
     );
   }
@@ -130,14 +182,26 @@ function RiskVisualPanel({ risk, series }: { risk: RiskVisual; series: any[] }) 
   if (risk.kind === 'concentration') {
     const pctValue = Math.min(100, Math.max(0, risk.value * 100));
     return (
-      <div className="risk-visual gauge-visual">
-        <div className="risk-head">
-          <span>{risk.label}</span>
-          <strong>{pctValue.toFixed(1)}%</strong>
+      <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-muted-foreground">{risk.label}</span>
+          <span className="text-base font-semibold tabular-nums">{pctValue.toFixed(1)}%</span>
         </div>
-        <div className="gauge-track"><span style={{ width: `${pctValue}%` }} /></div>
-        <div className="gauge-scale"><span>0%</span><span>30% watch</span><span>100%</span></div>
-        <p>{risk.helper}</p>
+        <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn(
+              'h-full rounded-full',
+              pctValue >= 30 ? 'bg-destructive' : pctValue >= 20 ? 'bg-foreground/70' : 'bg-foreground/40',
+            )}
+            style={{ width: `${pctValue}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-[11px] text-muted-foreground">
+          <span>0%</span>
+          <span>30% watch</span>
+          <span>100%</span>
+        </div>
+        <p className="text-xs text-muted-foreground">{risk.helper}</p>
       </div>
     );
   }
@@ -147,68 +211,126 @@ function RiskVisualPanel({ risk, series }: { risk: RiskVisual; series: any[] }) 
     const buyPct = (risk.buy / total) * 100;
     const sellPct = (risk.sell / total) * 100;
     return (
-      <div className="risk-visual flow-visual">
-        <div className="risk-head">
-          <span>{risk.label}</span>
-          <strong>{risk.ratio.toFixed(2)}x</strong>
+      <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-muted-foreground">{risk.label}</span>
+          <span className="text-base font-semibold tabular-nums">{risk.ratio.toFixed(2)}x</span>
         </div>
-        <div className="flow-stack">
-          <span className="buy" style={{ width: `${buyPct}%` }}>Buy {buyPct.toFixed(0)}%</span>
-          <span className="sell" style={{ width: `${sellPct}%` }}>Sell {sellPct.toFixed(0)}%</span>
+        <div className="flex h-6 w-full overflow-hidden rounded-md border bg-muted text-[11px] font-medium">
+          <span className="flex items-center justify-center bg-foreground text-background" style={{ width: `${buyPct}%` }}>
+            Buy {buyPct.toFixed(0)}%
+          </span>
+          <span className="flex items-center justify-center bg-destructive text-background" style={{ width: `${sellPct}%` }}>
+            Sell {sellPct.toFixed(0)}%
+          </span>
         </div>
-        <p>{risk.helper}</p>
+        <p className="text-xs text-muted-foreground">{risk.helper}</p>
       </div>
     );
   }
 
-  return <div className="risk-visual"><p>{risk.helper}</p></div>;
-}
-
-function ExecutionSummary({ analysis, rows }: { analysis: Analysis; rows: Row[] }) {
-  const contract = buildRuleContract(analysis.trace);
   return (
-    <section className="execution-summary" aria-label="generated report summary">
-      <article className="summary-lead">
-        <p className="section-kicker">Generated report summary</p>
-        <h2>{detectionLabel(analysis.detection.dataType)} 리포트가 자동 생성됐습니다.</h2>
-        <p>{rows.length.toLocaleString()}개 행에서 {analysis.kpis.length}개 KPI, {analysis.trace.length}단계 Skills trace, {analysis.reportSections.length}개 리포트 섹션을 구성했습니다.</p>
-      </article>
-      <div className="summary-cards">
-        {analysis.reportSections.map(section => (
-          <article className={`summary-card ${toneLabel(section.tone)}`} key={section.title}>
-            <span>{section.title}</span>
-            <strong>{section.value}</strong>
-            <p>{section.detail}</p>
-          </article>
-        ))}
-      </div>
-      <div className="contract-strip" aria-label="trace skills contract badge">
-        <span className={contract.unmatched.length ? 'contract-badge warn' : 'contract-badge matched'}>
-          {contract.unmatched.length ? 'contract review needed' : 'Trace ↔ Skills contract matched'}
-        </span>
-        <small>{contract.matched.length}/{analysis.trace.length} rule ids matched with Implemented demo rules</small>
-      </div>
-    </section>
+    <div className="rounded-lg border bg-muted/30 p-4 text-xs text-muted-foreground">{risk.helper}</div>
   );
 }
 
-function DiagnosticsPanel({ parseState, analysis }: { parseState: ParseState; analysis: Analysis | null }) {
-  const warnings = [...parseState.warnings, ...(analysis?.warnings ?? [])].filter((v, i, arr) => arr.indexOf(v) === i);
-  const unsupported = analysis?.detection.dataType === 'unknown';
-  if (!parseState.errors.length && !warnings.length && !unsupported) return null;
+function MainChart({ analysis, series }: { analysis: Analysis; series: any[] }) {
+  const isLine = analysis.detection.dataType === 'price_timeseries' || analysis.detection.dataType === 'market_indicator';
+  const isPrice = analysis.detection.dataType === 'price_timeseries';
+  if (isLine) {
+    return (
+      <ResponsiveContainer width="100%" height={320}>
+        <LineChart data={series} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+          <XAxis dataKey="date" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} stroke="var(--border)" />
+          <YAxis
+            yAxisId="price"
+            domain={['dataMin - 3', 'dataMax + 3']}
+            tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+            stroke="var(--border)"
+          />
+          <YAxis
+            yAxisId="return"
+            orientation="right"
+            tickFormatter={v => `${v}%`}
+            tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+            stroke="var(--border)"
+          />
+          <Tooltip
+            contentStyle={{
+              borderRadius: 8,
+              border: '1px solid var(--border)',
+              background: 'var(--popover)',
+              fontSize: 12,
+            }}
+          />
+          <Legend iconType="circle" wrapperStyle={{ fontSize: 12, color: 'var(--muted-foreground)' }} />
+          <Line
+            yAxisId="price"
+            name={isPrice ? '종가' : '지표값'}
+            dataKey="close"
+            stroke="var(--foreground)"
+            strokeWidth={2.2}
+            dot={false}
+          />
+          {isPrice && (
+            <Line
+              yAxisId="price"
+              name="MA20"
+              dataKey="ma20"
+              stroke="var(--chart-2)"
+              strokeWidth={1.4}
+              strokeDasharray="5 3"
+              dot={false}
+              connectNulls
+            />
+          )}
+          {isPrice && (
+            <Line
+              yAxisId="price"
+              name="MA60"
+              dataKey="ma60"
+              stroke="var(--chart-4)"
+              strokeWidth={1.4}
+              strokeDasharray="8 4"
+              dot={false}
+              connectNulls
+            />
+          )}
+          <Line
+            yAxisId="return"
+            name="누적 수익률"
+            dataKey="cumulativeReturnPct"
+            stroke="var(--muted-foreground)"
+            strokeWidth={1.6}
+            strokeDasharray="2 4"
+            dot={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    );
+  }
   return (
-    <section className={parseState.errors.length || unsupported ? 'diagnostic-panel error' : 'diagnostic-panel'} aria-label="csv diagnostics">
-      <div>
-        <p className="section-kicker">CSV readiness</p>
-        <h2>{parseState.errors.length ? 'CSV를 다시 확인해주세요.' : unsupported ? '지원되지 않는 구조입니다.' : '데이터 품질 경고'}</h2>
-      </div>
-      {parseState.errors.length > 0 && <ul>{parseState.errors.map(item => <li key={item}>{item}</li>)}</ul>}
-      {warnings.length > 0 && <ul>{warnings.map(item => <li key={item}>{item}</li>)}</ul>}
-      <div className="diagnostic-grid">
-        <div><strong>감지된 컬럼</strong><p>{parseState.detectedColumns.join(', ') || '없음'}</p></div>
-        <div><strong>추천 매핑</strong><p>{parseState.recommendations.join(' · ')}</p></div>
-      </div>
-    </section>
+    <ResponsiveContainer width="100%" height={320}>
+      <BarChart data={series} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+        <XAxis dataKey="name" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} stroke="var(--border)" />
+        <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} stroke="var(--border)" />
+        <Tooltip
+          contentStyle={{
+            borderRadius: 8,
+            border: '1px solid var(--border)',
+            background: 'var(--popover)',
+            fontSize: 12,
+          }}
+        />
+        <Bar
+          dataKey={analysis.detection.dataType === 'transaction_log' ? 'amount' : 'weight'}
+          fill="var(--foreground)"
+          radius={[6, 6, 0, 0]}
+        />
+      </BarChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -220,8 +342,15 @@ export default function App() {
   const [query, setQuery] = useState('수익률과 위험을 한 화면에서 요약해줘');
   const [isRunning, setIsRunning] = useState(false);
   const [lastRunAt, setLastRunAt] = useState<Date | null>(null);
-  const [lastPrompt, setLastPrompt] = useState('초기 샘플 자동 분석');
-  const [runCount, setRunCount] = useState(0);
+  const [, setLastPrompt] = useState('초기 샘플 자동 분석');
+  const [, setRunCount] = useState(0);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [skillsInitial, setSkillsInitial] = useState<SkillId>('01_data_detection');
+
+  const openSkill = (skill?: SkillId) => {
+    if (skill) setSkillsInitial(skill);
+    setSkillsOpen(true);
+  };
 
   useEffect(() => {
     loadCsv('/samples/price_timeseries.csv').then(({ rows, state }) => {
@@ -271,7 +400,7 @@ export default function App() {
   };
 
   const columns = useMemo(() => Object.keys(rows[0] ?? {}).slice(0, 6), [rows]);
-  const previewRows = rows.slice(0, 5);
+  const previewRows = rows.slice(0, 8);
   const confidence = analysis ? Math.round(analysis.detection.confidence * 100) : 0;
   const mode = focusMode(query);
   const contract = analysis ? buildRuleContract(analysis.trace) : null;
@@ -280,323 +409,416 @@ export default function App() {
       ...point,
       cumulativeReturnPct: typeof point.cumulativeReturn === 'number' ? point.cumulativeReturn * 100 : point.cumulativeReturn,
     })) ?? [],
-    [analysis]
+    [analysis],
   );
-  const heroKpi = analysis?.reportSections[0] ?? null;
-  const riskKpi = analysis?.reportSections.find(section => section.title === '위험 포인트') ?? null;
-  const contractScore = contract && analysis ? `${contract.matched.length}/${analysis.trace.length}` : '—';
+  const periodLabel = useMemo(() => {
+    const dates = chartSeries.map(s => s.date).filter(Boolean);
+    if (!dates.length) return '—';
+    if (dates.length === 1) return String(dates[0]);
+    return `${dates[0]} ~ ${dates[dates.length - 1]}`;
+  }, [chartSeries]);
+  const riskSignals = useMemo(
+    () => analysis?.kpis.filter(k => k.tone === 'bad' || k.tone === 'warn') ?? [],
+    [analysis],
+  );
+  const warnings = [...parseState.warnings, ...(analysis?.warnings ?? [])].filter((v, i, arr) => arr.indexOf(v) === i);
+  const unsupported = analysis?.detection.dataType === 'unknown';
+  const showDiagnostic = parseState.errors.length > 0 || warnings.length > 0 || unsupported;
 
   return (
-    <main className="page-shell">
-      <header className="topbar">
-        <div className="brand">
-          <div className="brand-mark">IS</div>
-          <div>
-            <strong>InvestSkill Lens</strong>
-            <span>Skills.md powered investment dashboard</span>
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex size-8 items-center justify-center rounded-md bg-foreground text-background text-xs font-bold">
+              IS
+            </div>
+            <div className="flex flex-col leading-tight">
+              <span className="text-sm font-semibold">InvestSkill Lens</span>
+              <span className="text-[11px] text-muted-foreground">투자 데이터 자동 분석 대시보드</span>
+            </div>
           </div>
-        </div>
-        <nav className="nav-pills" aria-label="dashboard sections">
-          <a href="#overview">Overview</a>
-          <a href="#summary">Report</a>
-          <a href="#chart">Chart</a>
-          <a href="#skills">Skills</a>
-        </nav>
-        <div className="topbar-actions" aria-label="getdesign inspired compact actions">
-          <span className="star-pill">Rule score {contractScore}</span>
-          <a className="topbar-cta" href="#skills">Open Skills.md</a>
+          <Button variant="outline" size="sm" onClick={() => openSkill('00_root')} className="gap-2">
+            <BookOpen data-icon="inline-start" />
+            분석 규칙
+            <ArrowUpRight data-icon="inline-end" />
+          </Button>
         </div>
       </header>
 
-      <section className="hero-card" id="overview">
-        <div className="hero-layout">
-          <div className="hero-copy">
-            <div className="trust-ribbon" aria-label="submission proof badges">
-              <span>Judge-ready</span>
-              <span>Browser only</span>
-              <span>Skills contract {contractScore}</span>
-            </div>
-            <p className="eyebrow">Premium Skills execution dashboard</p>
-            <h1>투자 CSV가 바로 심사용 리포트 화면으로 변환됩니다.</h1>
-            <p className="hero-desc">
-              데이터 판별, KPI 계산, 차트 선택, 위험 인사이트, 리포트 배치를 Skills.md 실행 근거와 함께 한 화면에서 증명합니다.
-            </p>
-          </div>
-
-          <aside className="hero-visual" aria-label="premium dashboard preview">
-            <div className="evidence-orbit"><span /> <span /> <span /></div>
-            <div className="hero-visual-card primary">
-              <small>Generated report</small>
-              <strong>{heroKpi?.value ?? 'Ready'}</strong>
-              <p>{heroKpi?.detail ?? '샘플 CSV를 자동 분석해 리포트 섹션을 구성합니다.'}</p>
-            </div>
-            <div className="design-proof-grid">
-              <div><span>Contract</span><strong>{contractScore}</strong></div>
-              <div><span>Trace</span><strong>{analysis?.trace.length ?? 0} steps</strong></div>
-              <div><span>Risk</span><strong>{riskKpi?.value ?? '—'}</strong></div>
-            </div>
-            <div className="quick-stats-panel" aria-label="getdesign quick stats">
-              <p className="terminal-kicker">▸ Quick Stats</p>
-              <dl>
-                <div><dt>Rows</dt><dd>{rows.length.toLocaleString()}</dd></div>
-                <div><dt>Detected</dt><dd>{analysis ? detectionLabel(analysis.detection.dataType) : 'Ready'}</dd></div>
-                <div><dt>Confidence</dt><dd>{confidence}%</dd></div>
-                <div><dt>Updated</dt><dd>{formatTime(lastRunAt)}</dd></div>
-              </dl>
-            </div>
-          </aside>
-        </div>
-
-        <div className="hero-command" aria-label="analysis command bar">
-          <span className={isRunning ? 'command-dot running' : 'command-dot'} />
-          <label className="command-label" htmlFor="analysisPrompt">Ask</label>
-          <input id="analysisPrompt" value={query} onChange={e => setQuery(e.target.value)} aria-label="analysis prompt" />
-          <button onClick={runAnalysis} disabled={isRunning || !rows.length}>{isRunning ? 'Running…' : 'Analyze'}</button>
-        </div>
-        <div className="run-strip" aria-label="analysis run state">
-          <span>mode <strong>{mode}</strong></span>
-          <span>runs <strong>{runCount}</strong></span>
-          <span>last <strong>{formatTime(lastRunAt)}</strong></span>
-          <span>contract <strong>{contract ? `${contract.matched.length}/${analysis?.trace.length ?? 0}` : '대기'}</strong></span>
-          <span className="last-prompt">prompt <strong>{lastPrompt}</strong></span>
-        </div>
-        {analysis && (
-          <div className="mobile-proof-strip" aria-label="mobile first screen proof">
-            <strong>Generated report ready</strong>
-            <span>Skills contract {contract?.matched.length ?? 0}/{analysis.trace.length} matched</span>
-            <span>Quick Stats · {rows.length.toLocaleString()} rows · confidence {confidence}%</span>
-          </div>
-        )}
-        <div className="hero-disclaimer" aria-label="investment disclaimer quick note">
-          투자 참고용 자동 리포트이며, 매수·매도 추천이나 수익 보장을 의미하지 않습니다.
-        </div>
-        <div className="sample-row" aria-label="sample datasets">
-          {samples.map(([label, url, desc]) => (
-            <button
-              key={url}
-              className={activeSample === url ? 'sample-chip active' : 'sample-chip'}
-              onClick={() => {
-                setActiveSample(url);
-                setLastPrompt(`${label} 샘플 자동 분석`);
-                loadCsv(url).then(({ rows, state }) => {
-                  setRows(rows);
-                  setParseState(state);
-                });
-              }}
-              title={desc}
-            >
-              {label}
-            </button>
-          ))}
-          <label className={activeSample === 'uploaded' ? 'sample-chip upload active' : 'sample-chip upload'}>
-            CSV 업로드
-            <input type="file" accept=".csv" onChange={e => onFile(e.target.files?.[0])} />
-          </label>
-        </div>
-      </section>
-
-      <section className="getdesign-reference-strip" aria-label="skills systems inspired from">
-        <span>SKILLS SYSTEMS INSPIRED FROM:</span>
-        {['CSV Detect', 'Metric Rules', 'Chart Choice', 'Risk Insight', 'Report Layout', 'Trace Contract'].map(item => (
-          <a href="#skills" key={item}>{item}</a>
-        ))}
-      </section>
-
-      <DiagnosticsPanel parseState={parseState} analysis={analysis} />
-
-      {analysis && (
-        <>
-          <ExecutionSummary analysis={analysis} rows={rows} />
-
-          <section className="metric-grid" aria-label="summary metrics">
-            <article className="metric-card dark-card">
-              <span>Detected data</span>
-              <strong>{detectionLabel(analysis.detection.dataType)}</strong>
-              <small>{rows.length.toLocaleString()} rows · confidence {confidence}%</small>
-              <i className="metric-spark" aria-hidden="true" />
-            </article>
-            {analysis.kpis.map(k => (
-              <article className={`metric-card ${toneLabel(k.tone)}`} key={k.label}>
-                <span>{k.label}</span>
-                <strong>{k.value}</strong>
-                <small>{toneLabel(k.tone)}</small>
-                <i className="metric-spark" aria-hidden="true" />
-              </article>
+      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-medium text-muted-foreground">데이터 소스</span>
+            {samples.map(sample => (
+              <Button
+                key={sample.url}
+                variant={activeSample === sample.url ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setActiveSample(sample.url);
+                  setLastPrompt(`${sample.label} 샘플 자동 분석`);
+                  loadCsv(sample.url).then(({ rows, state }) => {
+                    setRows(rows);
+                    setParseState(state);
+                  });
+                }}
+              >
+                {sample.label}
+              </Button>
             ))}
-          </section>
+            <label
+              className={cn(
+                'inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-accent',
+                activeSample === 'uploaded' && 'border-foreground bg-foreground text-background hover:bg-foreground',
+              )}
+            >
+              <Upload data-icon="inline-start" className="size-4" />
+              CSV 업로드
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={e => onFile(e.target.files?.[0])}
+              />
+            </label>
+            <Separator orientation="vertical" className="!h-6" />
+            <Badge variant="secondary" className="font-mono text-[11px]">
+              {analysis ? detectionLabel(analysis.detection.dataType) : 'detecting…'}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {rows.length.toLocaleString()} rows · confidence {confidence}%
+            </span>
+          </div>
 
-          <section className="workspace-grid">
-            <article className="panel chart-panel" id="chart">
-              <div className="panel-head">
-                <div>
-                  <p className="section-kicker">Auto visualization</p>
-                  <h2>자동 생성 차트</h2>
-                </div>
-                <div className="period-pills" aria-label="analysis meta badges">
-                  <span className="active">ALL</span>
-                  <span>{mode}</span>
-                  <span>{analysis.trace.length} rules</span>
-                </div>
-              </div>
-              <p className="chart-reason">{analysis.chartReason}</p>
-              <div className="chart-frame">
-                <ResponsiveContainer width="100%" height={340}>
-                  {analysis.detection.dataType === 'price_timeseries' || analysis.detection.dataType === 'market_indicator' ? (
-                    <LineChart data={chartSeries}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="date" tick={{ fill: '#737373', fontSize: 11 }} />
-                      <YAxis yAxisId="price" domain={['dataMin - 3', 'dataMax + 3']} tick={{ fill: '#737373', fontSize: 11 }} />
-                      <YAxis yAxisId="return" orientation="right" tickFormatter={v => `${v}%`} tick={{ fill: '#737373', fontSize: 11 }} />
-                      <Tooltip contentStyle={{ borderRadius: 14, border: '1px solid #e5e7eb' }} />
-                      <Legend iconType="circle" wrapperStyle={{ fontSize: 12, color: '#525252' }} />
-                      <Line yAxisId="price" name={analysis.detection.dataType === 'market_indicator' ? 'Value' : 'Close'} dataKey="close" stroke="#0284c7" strokeWidth={2.5} dot={false} />
-                      <Line yAxisId="return" name="Return %" dataKey="cumulativeReturnPct" stroke="#10b981" strokeWidth={2.5} dot={false} />
-                    </LineChart>
-                  ) : (
-                    <BarChart data={chartSeries}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="name" tick={{ fill: '#737373', fontSize: 11 }} />
-                      <YAxis tick={{ fill: '#737373', fontSize: 11 }} />
-                      <Tooltip contentStyle={{ borderRadius: 14, border: '1px solid #e5e7eb' }} />
-                      <Bar dataKey={analysis.detection.dataType === 'transaction_log' ? 'amount' : 'weight'} fill="#38bdf8" radius={[10, 10, 0, 0]} />
-                    </BarChart>
-                  )}
-                </ResponsiveContainer>
-              </div>
-              <RiskVisualPanel risk={analysis.riskVisual} series={chartSeries} />
-            </article>
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2">
+            <Sparkles className="ml-2 size-4 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="분석 초점을 입력해 보세요. 예) 위험 위주로 보여줘"
+              className="h-9 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
+            />
+            <Button onClick={runAnalysis} disabled={isRunning || !rows.length} size="sm">
+              {isRunning ? '분석 중…' : 'Analyze'}
+            </Button>
+          </div>
+        </section>
 
-            <aside className="panel insight-panel">
-              <div className="panel-head compact">
-                <div>
-                  <p className="section-kicker">Rule-based insight</p>
-                  <h2>핵심 판단</h2>
-                </div>
-                <span className="status-badge">실행 완료</span>
-              </div>
-              <ul className="insight-list">
-                {analysis.insights.map((i, idx) => (
-                  <li key={i}><span>{String(idx + 1).padStart(2, '0')}</span>{i}</li>
-                ))}
+        {showDiagnostic && (
+          <Alert variant={parseState.errors.length || unsupported ? 'destructive' : 'default'}>
+            <AlertTitle>
+              {parseState.errors.length
+                ? 'CSV를 다시 확인해주세요'
+                : unsupported
+                  ? '지원되지 않는 구조입니다'
+                  : '데이터 품질 경고'}
+            </AlertTitle>
+            <AlertDescription>
+              <ul className="mt-1 list-disc pl-5 text-xs">
+                {parseState.errors.map(item => <li key={item}>{item}</li>)}
+                {warnings.map(item => <li key={item}>{item}</li>)}
               </ul>
-              <div className="rule-card">
-                <strong>컬럼 매핑</strong>
-                {analysis.columnMapping.map(m => <p key={`${m.canonical}-${m.source}`}>• {m.label}: <code>{m.source}</code></p>)}
-              </div>
-              <div className="rule-card">
-                <strong>판별 근거</strong>
-                {analysis.detection.reasons.map(r => <p key={r}>• {r}</p>)}
-              </div>
-            </aside>
-          </section>
+              {parseState.recommendations.length > 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  추천 매핑: {parseState.recommendations.join(' · ')}
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
 
-          <section className="lower-grid" id="skills">
-            <article className="panel report-panel" id="summary">
-              <div className="panel-head">
-                <div>
-                  <p className="section-kicker">Generated report sections</p>
-                  <h2>자동 리포트 구성</h2>
-                </div>
-                <span className="row-count">{analysis.reportSections.length} sections</span>
-              </div>
-              <div className="report-list">
-                {analysis.reportSections.map(section => (
-                  <div className="report-row" key={section.title}>
-                    <span>{section.title}</span>
-                    <strong>{section.value}</strong>
-                    <p>{section.detail}</p>
+        {analysis && (
+          <>
+            <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {analysis.kpis.map(k => (
+                <Card key={k.label}>
+                  <CardHeader className="gap-1 pb-2">
+                    <CardDescription className="text-[11px]">{k.label}</CardDescription>
+                    <CardTitle className="text-xl tabular-nums">{k.value}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <Badge variant={toneVariant(k.tone)} className="text-[10px]">
+                      {k.tone === 'good'
+                        ? 'positive'
+                        : k.tone === 'bad'
+                          ? 'negative'
+                          : k.tone === 'warn'
+                            ? 'watch'
+                            : 'neutral'}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              ))}
+            </section>
+
+            <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex-row items-start justify-between gap-4">
+                  <div className="flex flex-col gap-1">
+                    <CardDescription>자동 시각화</CardDescription>
+                    <CardTitle>{analysis.chartReason}</CardTitle>
                   </div>
-                ))}
-              </div>
-            </article>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <Badge variant="outline" className="font-mono text-[11px]">{mode}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <MainChart analysis={analysis} series={chartSeries} />
+                  {analysis.detection.dataType === 'price_timeseries' && (
+                    <VolumeStrip series={chartSeries} />
+                  )}
+                  <RiskPanel risk={analysis.riskVisual} series={chartSeries} />
+                </CardContent>
+              </Card>
 
-            <article className="panel skill-flow">
-              <div className="panel-head">
-                <div>
-                  <p className="section-kicker">Skills execution trace</p>
-                  <h2>Skills.md 실행 근거</h2>
-                </div>
-                <span className="row-count">{analysis.trace.length} applied</span>
-              </div>
-              <div className="trace-timeline">
-                {analysis.trace.map(item => {
-                  const itemContract = contract?.matched.find(m => m.ruleId === item.ruleId);
-                  return (
-                    <div className="trace-item" key={`${item.step}-${item.ruleId}`}>
-                      <div className="trace-index">{item.step}</div>
-                      <div className="trace-body">
-                        <div className="trace-title">
-                          <span>{skillNames[item.skillId] ?? item.skillId}</span>
-                          <code>{item.ruleId}</code>
-                        </div>
-                        <div className="trace-contract">
-                          <span className={itemContract ? 'mini-contract matched' : 'mini-contract warn'}>{itemContract ? 'matched implemented rule' : 'unmatched'}</span>
-                        </div>
-                        <strong>{item.label}</strong>
-                        <p>{item.evidence.join(' · ')}</p>
-                        <small>{item.output}</small>
+              <Card>
+                <CardHeader>
+                  <CardDescription>분석 요약</CardDescription>
+                  <CardTitle>한눈에 보기</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4 text-sm">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-0.5 rounded-md border bg-muted/30 p-2.5">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">분석 기간</span>
+                      <strong className="text-xs tabular-nums">{periodLabel}</strong>
+                    </div>
+                    <div className="flex flex-col gap-0.5 rounded-md border bg-muted/30 p-2.5">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">데이터 수</span>
+                      <strong className="text-xs tabular-nums">{rows.length.toLocaleString()} rows</strong>
+                    </div>
+                    <div className="flex flex-col gap-0.5 rounded-md border bg-muted/30 p-2.5">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">분석 모드</span>
+                      <strong className="text-xs">{mode}</strong>
+                    </div>
+                    <div className="flex flex-col gap-0.5 rounded-md border bg-muted/30 p-2.5">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">마지막 실행</span>
+                      <strong className="text-xs tabular-nums">{formatTime(lastRunAt)}</strong>
+                    </div>
+                  </div>
+
+                  {riskSignals.length > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        주의 시그널 ({riskSignals.length})
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {riskSignals.map(sig => (
+                          <Badge key={sig.label} variant={toneVariant(sig.tone)} className="text-[10px] font-normal">
+                            {sig.label} · <span className="ml-1 font-mono">{sig.value}</span>
+                          </Badge>
+                        ))}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </article>
+                  )}
 
-            <article className="panel rule-ledger" aria-label="rule ledger table">
-              <div className="panel-head">
-                <div>
-                  <p className="section-kicker"># Rule Ledger</p>
-                  <h2>적용 규칙 카탈로그</h2>
+                  <Separator />
+
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">핵심 인사이트</span>
+                    <ul className="flex flex-col gap-1.5 leading-snug">
+                      {analysis.insights.slice(0, 3).map((insight, idx) => (
+                        <li key={insight} className="flex gap-2 text-sm">
+                          <span className="mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold tabular-nums">
+                            {idx + 1}
+                          </span>
+                          <span>{insight}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
+
+            <section id="skills">
+              <Tabs defaultValue="insights" className="gap-4">
+                <TabsList>
+                  <TabsTrigger value="insights">인사이트</TabsTrigger>
+                  <TabsTrigger value="trace">분석 단계</TabsTrigger>
+                  <TabsTrigger value="ledger">규칙 카탈로그</TabsTrigger>
+                  <TabsTrigger value="preview">데이터 미리보기</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="insights">
+                  <Card>
+                    <CardHeader>
+                      <CardDescription>규칙 기반 자동 인사이트</CardDescription>
+                      <CardTitle>자동 생성 리포트</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="flex flex-col gap-3">
+                        <span className="text-xs font-medium text-muted-foreground">리포트 섹션</span>
+                        {analysis.reportSections.map(section => (
+                          <div key={section.title} className="flex flex-col gap-1 rounded-lg border bg-card p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs text-muted-foreground">{section.title}</span>
+                              <Badge variant={toneVariant(section.tone)} className="text-[10px]">
+                                {section.tone ?? 'neutral'}
+                              </Badge>
+                            </div>
+                            <strong className="text-base font-semibold tabular-nums">{section.value}</strong>
+                            <p className="text-xs text-muted-foreground">{section.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          전체 인사이트 ({analysis.insights.length})
+                        </span>
+                        <ol className="flex flex-col gap-2 text-sm">
+                          {analysis.insights.map((insight, idx) => (
+                            <li key={insight} className="flex gap-2 rounded-lg border bg-card p-3">
+                              <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[11px] font-semibold tabular-nums">
+                                {String(idx + 1).padStart(2, '0')}
+                              </span>
+                              <span className="leading-snug">{insight}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="trace">
+                  <Card>
+                    <CardHeader>
+                      <CardDescription>분석 단계 추적</CardDescription>
+                      <CardTitle>판별 → 지표 → 차트 → 인사이트 → 레이아웃</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-col gap-3">
+                        {analysis.trace.map(item => {
+                          const itemContract = contract?.matched.find(m => m.ruleId === item.ruleId);
+                          return (
+                            <div key={`${item.step}-${item.ruleId}`} className="flex gap-3 rounded-lg border bg-card p-3">
+                              <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold">
+                                {item.step}
+                              </div>
+                              <div className="flex flex-1 flex-col gap-1.5">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge variant="outline" className="font-mono text-[10px]">
+                                    {skillNames[item.skillId] ?? item.skillId}
+                                  </Badge>
+                                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">{item.ruleId}</code>
+                                  <Badge
+                                    variant={itemContract ? 'default' : 'secondary'}
+                                    className="text-[10px]"
+                                  >
+                                    {itemContract ? '일치' : '미정의'}
+                                  </Badge>
+                                </div>
+                                <strong className="text-sm">{item.label}</strong>
+                                <p className="text-xs text-muted-foreground">{item.evidence.join(' · ')}</p>
+                                <span className="text-xs">{item.output}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="ledger">
+                  <Card>
+                    <CardHeader>
+                      <CardDescription>적용된 분석 규칙</CardDescription>
+                      <CardTitle>규칙 카탈로그</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-24">단계</TableHead>
+                            <TableHead>규칙 ID</TableHead>
+                            <TableHead>결과</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {analysis.trace.map(item => (
+                            <TableRow key={`ledger-${item.ruleId}`}>
+                              <TableCell className="font-medium">
+                                {skillNames[item.skillId] ?? item.step}
+                              </TableCell>
+                              <TableCell>
+                                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">{item.ruleId}</code>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">{item.output}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="preview">
+                  <Card>
+                    <CardHeader className="flex-row items-center justify-between">
+                      <div>
+                        <CardDescription>Input preview</CardDescription>
+                        <CardTitle>{rows.length.toLocaleString()} rows · 상위 8행</CardTitle>
+                      </div>
+                      <Badge variant="outline" className="font-mono text-[11px]">
+                        {columns.length} cols
+                      </Badge>
+                    </CardHeader>
+                    <CardContent>
+                      <ScrollArea className="w-full">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              {columns.map(c => <TableHead key={c}>{c}</TableHead>)}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {previewRows.map((row, idx) => (
+                              <TableRow key={idx}>
+                                {columns.map(c => (
+                                  <TableCell key={c} className="font-mono text-xs">
+                                    {row[c]}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </section>
+
+            <section className="rounded-lg border bg-muted/40 p-4">
+              <div className="flex flex-wrap items-start gap-3">
+                <FileUp className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <div className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
+                  <strong className="text-foreground">컬럼 매핑 근거</strong>
+                  <p>
+                    {analysis.columnMapping.map(m => `${m.label}: ${m.source}`).join(' · ')}
+                  </p>
+                  <p className="text-[11px]">
+                    판별 사유: {analysis.detection.reasons.join(' · ')}
+                  </p>
                 </div>
-                <span className="row-count">Sortable proof</span>
               </div>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr><th>Step</th><th>Rule ID</th><th>Output</th></tr>
-                  </thead>
-                  <tbody>
-                    {analysis.trace.map(item => (
-                      <tr key={`ledger-${item.ruleId}`}>
-                        <td>{skillNames[item.skillId] ?? item.step}</td>
-                        <td><code>{item.ruleId}</code></td>
-                        <td>{item.output}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </article>
+            </section>
+          </>
+        )}
 
-            <article className="panel data-preview">
-              <div className="panel-head">
-                <div>
-                  <p className="section-kicker">Input preview</p>
-                  <h2>데이터 샘플</h2>
-                </div>
-                <span className="row-count">{rows.length} rows</span>
-              </div>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>{columns.map(c => <th key={c}>{c}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {previewRows.map((row, idx) => (
-                      <tr key={idx}>{columns.map(c => <td key={c}>{row[c]}</td>)}</tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </article>
-          </section>
-        </>
-      )}
+        <footer className="flex flex-col gap-2 border-t pt-6 text-xs text-muted-foreground">
+          <strong className="text-sm text-foreground">투자 유의사항</strong>
+          <p>
+            InvestSkill Lens는 입력 CSV를 정의된 분석 규칙으로 요약하는 교육용 자동 리포트입니다.
+            매수·매도 추천, 투자자문, 수익 보장을 제공하지 않습니다.
+          </p>
+        </footer>
+      </main>
 
-      <footer className="disclaimer-footer" aria-label="investment disclaimer">
-        <strong>투자 유의사항</strong>
-        <span>InvestSkill Lens는 입력 CSV를 Skills.md 규칙으로 요약하는 교육용 자동 리포트입니다. 매수·매도 추천, 투자자문, 수익 보장을 제공하지 않습니다.</span>
-      </footer>
-    </main>
+      <SkillsInspector open={skillsOpen} onOpenChange={setSkillsOpen} initial={skillsInitial} />
+    </div>
   );
 }

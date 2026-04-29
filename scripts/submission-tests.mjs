@@ -28,14 +28,31 @@ for (const text of [readme]) {
 }
 
 for (const text of [skills]) {
-  includes(text, 'CSV rows -> detection -> metrics -> chart -> insight -> layout', 'root Skills contract');
+  includes(text, '(1) Detection', 'root Skills pipeline detection step');
+  includes(text, '(5) Layout', 'root Skills pipeline layout step');
   includes(text, 'skills/01_data_detection.md', 'root Skills index 01');
   includes(text, 'detect.price_timeseries.ohlcv', 'root Skills implemented rule id');
   includes(text, 'metric.portfolio.top_weight', 'root Skills portfolio rule id');
   includes(text, 'chart.transaction.buy_sell_bar_meter', 'root Skills transaction chart id');
   includes(text, 'public/skills/*.md', 'root Skills mirror note');
-  includes(text, 'Declared future rules', 'root Skills future boundary');
+  includes(text, '확장 정책', 'root Skills future boundary policy');
   includes(text, '매수·매도 추천 금지', 'root Skills safety boundary');
+}
+
+const skillFiles = [
+  'skills/01_data_detection.md',
+  'skills/02_metric_rules.md',
+  'skills/03_chart_selection.md',
+  'skills/04_insight_generation.md',
+  'skills/05_report_layout.md',
+];
+for (const path of skillFiles) {
+  const text = read(path);
+  includes(text, '## 목적과 위치', `${path} 목적과 위치 절`);
+  includes(text, '## 한계와 의도된 비대응', `${path} 한계 절`);
+  includes(text, '## 구현 매트릭스', `${path} 구현 매트릭스 절`);
+  includes(text, '## 확장', `${path} 확장 절`);
+  includes(text, '## 검증 방법', `${path} 검증 방법 절`);
 }
 
 for (const [name, text] of [['proposal', proposal], ['template', template]]) {

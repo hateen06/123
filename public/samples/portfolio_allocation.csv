@@ -1,6 +1,15 @@
 ticker,weight,sector,region
-AAPL,0.28,Technology,US
-MSFT,0.22,Technology,US
-NVDA,0.18,Semiconductor,US
-SPY,0.20,Broad Market,US
-TLT,0.12,Bond,US
+AAPL,0.32,Technology,US
+MSFT,0.18,Technology,US
+NVDA,0.10,Semiconductor,US
+GOOGL,0.06,Technology,US
+TSLA,0.06,Consumer Discretionary,US
+AMZN,0.05,Consumer Discretionary,US
+BRK.B,0.04,Financial,US
+TLT,0.04,Bond,US
+JPM,0.03,Financial,US
+JNJ,0.03,Healthcare,US
+UNH,0.03,Healthcare,US
+TIGER 200,0.02,Broad Market,KR
+KODEX 200,0.02,Broad Market,KR
+V,0.02,Financial,US

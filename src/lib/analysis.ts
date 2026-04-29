@@ -70,7 +70,7 @@ const IMPLEMENTED_RULE_CATALOG: Record<string, { skillId: string; description: s
   'insight.transaction.activity_normal': { skillId: '04_insight_generation', description: '거래 횟수 보통이면 활동 정상 문장 생성' },
   'insight.market_indicator.trend': { skillId: '04_insight_generation', description: '시장 지표 변화 방향 요약 문장 생성' },
   'insight.unknown.safe_summary': { skillId: '04_insight_generation', description: '지원되지 않는 구조는 안전한 기본 요약만 생성' },
-  'layout.dashboard.evidence_first': { skillId: '05_report_layout', description: 'KPI, 차트, 리포트 요약, Skills 실행 근거, 데이터 미리보기 순서 배치' },
+  'layout.dashboard.evidence_first': { skillId: '05_report_layout', description: 'KPI, 차트, 리포트 요약, 분석 단계 추적, 데이터 미리보기 순서 배치' },
 };
 
 const has = (cols: string[], names: string[]) => names.find(n => cols.includes(n));
@@ -139,7 +139,7 @@ function buildReportSections(analysis: Omit<Analysis, 'reportSections'>): Report
     { title: '핵심 요약', value: firstKpi?.value ?? `${analysis.series.length} rows`, detail: analysis.insights[0] ?? '입력 데이터 기반 요약을 생성했습니다.', tone: firstKpi?.tone ?? 'neutral' },
     { title: '위험 포인트', value: analysis.riskVisual.kind === 'none' ? 'N/A' : analysis.riskVisual.label, detail: riskDetail, tone: analysis.riskVisual.kind === 'none' ? 'neutral' : 'warn' },
     { title: '생성된 화면', value: `${analysis.trace.length}단계`, detail: 'KPI, 차트, 위험 시각화, 근거 타임라인, 데이터 미리보기로 자동 구성', tone: 'good' },
-    { title: 'Skills 계약', value: `${contractCount}/${analysis.trace.length} matched`, detail: '화면 trace rule id가 Implemented demo rules catalog와 일치', tone: contractCount === analysis.trace.length ? 'good' : 'warn' },
+    { title: '규칙 정합', value: `${contractCount}/${analysis.trace.length} 일치`, detail: '화면에 적용된 규칙 ID가 정의된 규칙 카탈로그와 일치', tone: contractCount === analysis.trace.length ? 'good' : 'warn' },
   ];
 }
 
@@ -181,7 +181,7 @@ function layoutTrace(sections: string): TraceStep {
     skillId: '05_report_layout',
     ruleId: 'layout.dashboard.evidence_first',
     label: '리포트 레이아웃 배치',
-    evidence: ['KPI, 차트, generated report summary, 위험 요약, Skills 실행 근거, 데이터 미리보기 순서로 배치'],
+    evidence: ['KPI, 차트, 자동 리포트 요약, 위험 시각, 분석 단계 추적, 데이터 미리보기 순서로 배치'],
     output: sections,
   };
 }
@@ -268,20 +268,44 @@ function analyzePrice(rows: Row[], detection: Detection, warnings: string[]): An
   const totalReturn = last / first - 1;
   const avg = returns.reduce((a, b) => a + b, 0) / Math.max(returns.length, 1);
   const vol = Math.sqrt(returns.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / Math.max(returns.length, 1)) * Math.sqrt(252);
+  const rolling = (arr: number[], window: number) =>
+    arr.map((_, i) => {
+      if (i + 1 < window) return null;
+      const slice = arr.slice(i + 1 - window, i + 1);
+      return slice.reduce((a, b) => a + b, 0) / window;
+    });
+  const ma20Arr = rolling(prices, 20);
+  const ma60Arr = rolling(prices, 60);
   let peak = first, mdd = 0;
-  const series = sorted.map((r) => {
+  const series = sorted.map((r, i) => {
     const close = num(r[c]);
     peak = Math.max(peak, close);
     const drawdown = close / peak - 1;
     mdd = Math.min(mdd, drawdown);
-    return { date: r[d], close, cumulativeReturn: close / first - 1, drawdown, drawdownPct: drawdown * 100 };
+    const volume = num(r['volume'] ?? r['거래량'] ?? r['수량합계'] ?? 0);
+    return {
+      date: r[d],
+      close,
+      cumulativeReturn: close / first - 1,
+      drawdown,
+      drawdownPct: drawdown * 100,
+      ma20: ma20Arr[i],
+      ma60: ma60Arr[i],
+      volume,
+    };
   });
   const trend = totalReturn >= 0 ? '상승 관찰' : '약세 관찰';
+  const maxPrice = prices.length ? Math.max(...prices) : 0;
+  const minPrice = prices.length ? Math.min(...prices) : 0;
   const kpis: Kpi[] = [
     { label: '총 수익률', value: pct(totalReturn), tone: totalReturn >= 0 ? 'good' : 'bad' },
     { label: '연환산 변동성', value: pct(vol), tone: vol >= 0.3 ? 'warn' : 'neutral' },
     { label: '최대 낙폭', value: pct(mdd), tone: mdd <= -0.1 ? 'bad' : 'neutral' },
-    { label: '추세', value: trend, tone: totalReturn >= 0 ? 'good' : 'warn' }
+    { label: '추세', value: trend, tone: totalReturn >= 0 ? 'good' : 'warn' },
+    { label: '최근 종가', value: last.toFixed(2), tone: 'neutral' },
+    { label: '기간 최고가', value: maxPrice.toFixed(2), tone: 'good' },
+    { label: '기간 최저가', value: minPrice.toFixed(2), tone: 'warn' },
+    { label: '거래일 수', value: String(prices.length), tone: 'neutral' },
   ];
   const insights = [
     totalReturn >= 0 ? '분석 기간 동안 가격 상승 흐름이 관찰됩니다.' : '분석 기간 동안 가격 약세 흐름이 관찰됩니다.',
@@ -315,13 +339,23 @@ function analyzePortfolio(rows: Row[], detection: Detection, warnings: string[])
     return { name: r[t], weight };
   });
   const total = series.reduce((a, b) => a + b.weight, 0);
-  const top = [...series].sort((a, b) => b.weight - a.weight)[0];
+  const sortedSeries = [...series].sort((a, b) => b.weight - a.weight);
+  const top = sortedSeries[0];
   const topWeight = top?.weight || 0;
+  const top3Weight = sortedSeries.slice(0, 3).reduce((a, b) => a + b.weight, 0);
+  const sectorSet = new Set(rows.map(r => String(r['sector'] ?? r['섹터'] ?? '').trim()).filter(Boolean));
+  const regionSet = new Set(rows.map(r => String(r['region'] ?? r['지역'] ?? '').trim()).filter(Boolean));
+  const hhi = series.reduce((a, b) => a + b.weight * b.weight, 0);
+  const diversification = Math.max(0, Math.min(1, 1 - hhi));
   const kpis: Kpi[] = [
     { label: '자산 수', value: String(series.length) },
     { label: '총 비중', value: pct(total), tone: Math.abs(total - 1) > 0.05 ? 'warn' : 'good' },
     { label: 'Top1 비중', value: pct(topWeight), tone: topWeight >= 0.3 ? 'bad' : 'neutral' },
-    { label: '집중도', value: topWeight >= 0.3 ? '높음' : '보통', tone: topWeight >= 0.3 ? 'warn' : 'good' }
+    { label: '집중도', value: topWeight >= 0.3 ? '높음' : '보통', tone: topWeight >= 0.3 ? 'warn' : 'good' },
+    { label: 'Top3 비중', value: pct(top3Weight), tone: top3Weight >= 0.6 ? 'warn' : 'neutral' },
+    { label: '섹터 수', value: String(sectorSet.size || '—'), tone: sectorSet.size >= 4 ? 'good' : 'warn' },
+    { label: '지역 수', value: String(regionSet.size || '—'), tone: regionSet.size >= 2 ? 'good' : 'warn' },
+    { label: '분산 점수', value: `${(diversification * 100).toFixed(0)}/100`, tone: diversification >= 0.7 ? 'good' : 'warn' },
   ];
   const insights = [
     `가장 큰 보유 자산은 ${top?.name ?? 'N/A'}이며 비중은 ${pct(topWeight)}입니다.`,
@@ -350,16 +384,35 @@ function analyzeTransactions(rows: Row[], detection: Detection, warnings: string
   const q = detection.mapped.quantity;
   const p = detection.mapped.price;
   let buy = 0, sell = 0;
+  let totalQty = 0, totalAmount = 0;
+  const tickerSet = new Set<string>();
+  const dateSet = new Set<string>();
+  const dateField = detection.mapped.date;
+  const tickerField = detection.mapped.ticker;
   rows.forEach(r => {
-    const amount = num(r[q]) * num(r[p]);
+    const qty = num(r[q]);
+    const price = num(r[p]);
+    const amount = qty * price;
+    totalQty += qty;
+    totalAmount += amount;
     normalizeSide(r[side]) === 'sell' ? sell += amount : buy += amount;
+    const ticker = String(r[tickerField] ?? r['ticker'] ?? r['종목'] ?? '').trim();
+    if (ticker) tickerSet.add(ticker);
+    const dateValue = String(r[dateField] ?? '').trim();
+    if (dateValue) dateSet.add(dateValue);
   });
   const ratio = buy / Math.max(sell, 1);
+  const avgExecution = totalAmount / Math.max(totalQty, 1);
+  const dailyAvg = rows.length / Math.max(dateSet.size, 1);
   const kpis: Kpi[] = [
     { label: '거래 수', value: String(rows.length) },
-    { label: '매수 금액', value: buy.toFixed(0) },
-    { label: '매도 금액', value: sell.toFixed(0) },
-    { label: '거래 상태', value: rows.length >= 20 ? '과다 점검' : '보통', tone: rows.length >= 20 ? 'warn' : 'neutral' }
+    { label: '매수 금액', value: buy.toLocaleString() },
+    { label: '매도 금액', value: sell.toLocaleString() },
+    { label: '거래 상태', value: rows.length >= 20 ? '과다 점검' : '보통', tone: rows.length >= 20 ? 'warn' : 'neutral' },
+    { label: '매수/매도 비율', value: `${ratio.toFixed(2)}x`, tone: ratio >= 1.5 ? 'good' : ratio <= 0.5 ? 'warn' : 'neutral' },
+    { label: '종목 수', value: String(tickerSet.size), tone: tickerSet.size >= 5 ? 'good' : 'neutral' },
+    { label: '평균 체결가', value: avgExecution.toFixed(2), tone: 'neutral' },
+    { label: '일평균 거래', value: dailyAvg.toFixed(1), tone: dailyAvg >= 1 ? 'warn' : 'neutral' },
   ];
   const insights = [
     `총 매수 금액은 ${buy.toFixed(0)}, 총 매도 금액은 ${sell.toFixed(0)}입니다.`,
@@ -392,11 +445,20 @@ function analyzeMarketIndicator(rows: Row[], detection: Detection, warnings: str
   const last = values[values.length - 1] || first;
   const change = last / first - 1;
   const series = sorted.map(r => ({ date: r[d], close: num(r[v]), cumulativeReturn: num(r[v]) / first - 1 }));
+  const indicatorMax = values.length ? Math.max(...values) : 0;
+  const indicatorMin = values.length ? Math.min(...values) : 0;
+  const indicatorAvg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  const indicatorVar = values.length ? values.reduce((a, b) => a + Math.pow(b - indicatorAvg, 2), 0) / values.length : 0;
+  const indicatorStd = Math.sqrt(indicatorVar);
   const kpis: Kpi[] = [
     { label: '최근 값', value: last.toFixed(2), tone: 'neutral' },
     { label: '기간 변화', value: pct(change), tone: change >= 0 ? 'good' : 'warn' },
     { label: '관측 수', value: String(rows.length), tone: 'neutral' },
     { label: '추세', value: change >= 0 ? '상승' : '하락', tone: change >= 0 ? 'good' : 'warn' },
+    { label: '기간 최고', value: indicatorMax.toFixed(2), tone: 'good' },
+    { label: '기간 최저', value: indicatorMin.toFixed(2), tone: 'warn' },
+    { label: '평균', value: indicatorAvg.toFixed(2), tone: 'neutral' },
+    { label: '표준편차', value: indicatorStd.toFixed(2), tone: 'neutral' },
   ];
   const insights = [
     `시장 지표는 기간 초 대비 ${pct(change)} 변화했습니다.`,

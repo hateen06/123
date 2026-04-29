@@ -5,3 +5,10 @@ dist/
 *.log
 .DS_Store
 .codex_*_session_id
+.omc/
+.claude/
+.agents/
+.playwright-mcp/
+/desktop-*.png
+/mobile-*.png
+/skills-*.png
