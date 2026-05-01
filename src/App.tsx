@@ -494,10 +494,27 @@ export default function App() {
         },
       ]
     : [];
+  const reviewMap = [
+    { id: 'input', label: 'Input', detail: 'CSV' },
+    { id: 'kpi', label: 'KPI', detail: 'numbers' },
+    { id: 'proof', label: 'Proof', detail: 'contract' },
+    { id: 'chart', label: 'Chart', detail: 'why' },
+    { id: 'report', label: 'Report', detail: 'summary' },
+    { id: 'trace', label: 'Trace', detail: 'rules' },
+    { id: 'skills', label: 'Skills', detail: 'source' },
+  ];
+  const chartTrace = analysis?.trace.find(item => item.skillId === '03_chart_selection');
+  const chartRationale = chartTrace
+    ? {
+        ruleId: chartTrace.ruleId,
+        evidence: chartTrace.evidence[0] ?? analysis?.chartReason ?? 'chart rule matched',
+        output: chartTrace.output,
+      }
+    : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
             <div className="flex size-8 items-center justify-center rounded-md bg-foreground text-background text-xs font-bold">
@@ -516,8 +533,26 @@ export default function App() {
         </div>
       </header>
 
+      {analysis && (
+        <nav aria-label="Review map" className="sticky top-14 z-10 border-b bg-background/95 backdrop-blur">
+          <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-6 py-2 text-xs">
+            <span className="shrink-0 font-medium text-muted-foreground">Review map</span>
+            {reviewMap.map(item => (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border bg-card px-2.5 py-1 transition-colors hover:bg-muted/60"
+              >
+                <span className="font-medium">{item.label}</span>
+                <span className="text-[10px] text-muted-foreground">{item.detail}</span>
+              </a>
+            ))}
+          </div>
+        </nav>
+      )}
+
       <main className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
-        <section className="flex flex-col gap-3">
+        <section id="input" className="scroll-mt-28 flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="mr-1 text-xs font-medium text-muted-foreground">데이터 소스</span>
             {samples.map(sample => (
@@ -630,7 +665,7 @@ export default function App() {
               ))}
             </section>
 
-            <section className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+            <section id="kpi" className="scroll-mt-28 grid grid-cols-1 gap-3 lg:grid-cols-4">
               {primaryKpis.map((k, idx) => (
                 <Card
                   key={k.label}
@@ -668,7 +703,7 @@ export default function App() {
               ))}
             </section>
 
-            <section className="grid grid-cols-1 gap-3 rounded-xl border bg-muted/25 p-3 lg:grid-cols-[1.05fr_0.95fr]">
+            <section id="proof" className="scroll-mt-28 grid grid-cols-1 gap-3 rounded-xl border bg-muted/25 p-3 lg:grid-cols-[1.05fr_0.95fr]">
               <Card className="bg-background shadow-none">
                 <CardHeader className="pb-3">
                   <CardDescription>Proof flow</CardDescription>
@@ -748,7 +783,7 @@ export default function App() {
               </section>
             )}
 
-            <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <section id="chart" className="scroll-mt-28 grid grid-cols-1 gap-4 lg:grid-cols-3">
               <Card className="bg-transparent shadow-none ring-0 lg:col-span-2">
                 <CardHeader className="flex-row items-start justify-between gap-4">
                   <div className="flex flex-col gap-1">
@@ -760,6 +795,20 @@ export default function App() {
                   </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4">
+                  {chartRationale && (
+                    <div className="grid gap-2 rounded-lg border bg-card p-3 text-xs md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)]">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-medium text-muted-foreground">Chart rationale</span>
+                        <code className="w-fit rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+                          {chartRationale.ruleId}
+                        </code>
+                      </div>
+                      <div className="flex flex-col gap-1 text-muted-foreground">
+                        <span>{chartRationale.evidence}</span>
+                        <span className="text-foreground">{chartRationale.output}</span>
+                      </div>
+                    </div>
+                  )}
                   <MainChart analysis={analysis} series={chartSeries} />
                   {analysis.detection.dataType === 'price_timeseries' && (
                     <VolumeStrip series={chartSeries} />
@@ -836,7 +885,7 @@ export default function App() {
                   <TabsTrigger value="preview">데이터 미리보기</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="insights">
+                <TabsContent id="report" value="insights" className="scroll-mt-28">
                   <Card>
                     <CardHeader>
                       <CardDescription>규칙 기반 자동 인사이트</CardDescription>
@@ -877,7 +926,7 @@ export default function App() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="trace">
+                <TabsContent id="trace" value="trace" className="scroll-mt-28">
                   <Card>
                     <CardHeader>
                       <CardDescription>분석 단계 추적</CardDescription>
