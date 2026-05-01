@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -11,6 +11,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import type { TraceStep } from '@/lib/analysis';
 
 const SKILL_FILES = [
   { id: '00_root', label: '전체 정의서', url: '/Skills.md', subtitle: '분석 규칙 인덱스' },
@@ -22,20 +23,40 @@ const SKILL_FILES = [
 ] as const;
 
 export type SkillId = (typeof SKILL_FILES)[number]['id'];
+type CurrentTraceItem = TraceStep & { matched?: boolean };
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initial?: SkillId;
+  currentTrace?: CurrentTraceItem[];
 };
 
-export function SkillsInspector({ open, onOpenChange, initial }: Props) {
+function isSkillId(value: string): value is SkillId {
+  return SKILL_FILES.some(file => file.id === value);
+}
+
+export function SkillsInspector({ open, onOpenChange, initial, currentTrace = [] }: Props) {
   const [active, setActive] = useState<SkillId>(initial ?? '01_data_detection');
   const [content, setContent] = useState<Record<string, string>>({});
+  const [traceOnly, setTraceOnly] = useState(false);
+  const currentTraceSkillIds = useMemo(
+    () => Array.from(new Set(currentTrace.map(item => item.skillId).filter(isSkillId))),
+    [currentTrace],
+  );
+  const currentTraceSkillKey = currentTraceSkillIds.join('|');
+  const visibleSkillFiles = traceOnly && currentTraceSkillIds.length
+    ? SKILL_FILES.filter(file => currentTraceSkillIds.includes(file.id))
+    : SKILL_FILES;
 
   useEffect(() => {
     if (initial && open) setActive(initial);
   }, [initial, open]);
+
+  useEffect(() => {
+    if (!traceOnly || !currentTraceSkillIds.length) return;
+    if (!currentTraceSkillIds.includes(active)) setActive(currentTraceSkillIds[0]);
+  }, [active, currentTraceSkillIds, currentTraceSkillKey, traceOnly]);
 
   useEffect(() => {
     if (!open) return;
@@ -61,10 +82,48 @@ export function SkillsInspector({ open, onOpenChange, initial }: Props) {
             현재 화면이 따르는 분석 규칙 모음. 데이터 판별 → 지표 → 시각화 → 인사이트 → 레이아웃 순서로 정의됩니다.
           </SheetDescription>
         </SheetHeader>
+        {currentTrace.length > 0 && (
+          <div className="border-b px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-medium text-muted-foreground">Current Trace Only</span>
+                <strong className="text-sm">현재 화면에 적용된 rule만 빠르게 확인</strong>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTraceOnly(value => !value)}
+                className="rounded-md border bg-background px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted/60"
+              >
+                {traceOnly ? 'show all skills' : 'current trace only'}
+              </button>
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {currentTrace.map(item => (
+                <button
+                  key={`inspector-trace-${item.step}-${item.ruleId}`}
+                  type="button"
+                  onClick={() => isSkillId(item.skillId) && setActive(item.skillId)}
+                  className="flex min-w-0 items-center gap-2 rounded-lg border bg-card p-2 text-left transition-colors hover:bg-muted/50"
+                >
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-[11px] font-semibold">
+                    {item.step}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-mono text-[11px]">{item.ruleId}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">{item.output}</span>
+                  </span>
+                  <Badge variant={item.matched ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
+                    {item.matched ? 'matched' : 'review'}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <Tabs value={active} onValueChange={(v) => setActive(v as SkillId)} className="flex flex-1 flex-col gap-0 overflow-hidden">
           <div className="border-b px-4 py-2">
             <TabsList className="h-auto flex-wrap gap-1">
-              {SKILL_FILES.map(f => (
+              {visibleSkillFiles.map(f => (
                 <TabsTrigger key={f.id} value={f.id} className="text-xs">
                   {f.label}
                 </TabsTrigger>
@@ -74,7 +133,7 @@ export function SkillsInspector({ open, onOpenChange, initial }: Props) {
               <p className="mt-2 px-1 text-[11px] text-muted-foreground">{activeMeta.subtitle} · <code>{activeMeta.url}</code></p>
             )}
           </div>
-          {SKILL_FILES.map(f => (
+          {visibleSkillFiles.map(f => (
             <TabsContent
               key={f.id}
               value={f.id}

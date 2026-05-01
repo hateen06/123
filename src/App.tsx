@@ -511,6 +511,7 @@ export default function App() {
         output: chartTrace.output,
       }
     : null;
+  const reportPreview = analysis?.reportSections.slice(0, 4) ?? [];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -876,6 +877,32 @@ export default function App() {
               </Card>
             </section>
 
+            <section className="rounded-xl border bg-muted/20 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">Generated report preview</span>
+                  <strong className="text-base">자동 리포트가 생성한 4개 판단 카드</strong>
+                </div>
+                <a href="#report" className="rounded-md border bg-background px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted/60">
+                  full report
+                </a>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
+                {reportPreview.map(section => (
+                  <div key={`preview-${section.title}`} className="flex min-h-24 flex-col gap-1 rounded-lg border bg-card p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-muted-foreground">{section.title}</span>
+                      <Badge variant={toneVariant(section.tone)} className="text-[10px]">
+                        {section.tone ?? 'neutral'}
+                      </Badge>
+                    </div>
+                    <strong className="text-sm font-semibold tabular-nums">{section.value}</strong>
+                    <p className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">{section.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
             <section id="skills">
               <Tabs defaultValue="insights" className="gap-4">
                 <TabsList>
@@ -1063,7 +1090,7 @@ export default function App() {
         </footer>
       </main>
 
-      <SkillsInspector open={skillsOpen} onOpenChange={setSkillsOpen} initial={skillsInitial} />
+      <SkillsInspector open={skillsOpen} onOpenChange={setSkillsOpen} initial={skillsInitial} currentTrace={traceSnapshot} />
     </div>
   );
 }
