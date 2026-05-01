@@ -466,6 +466,34 @@ export default function App() {
         matched: Boolean(contract?.matched.some(rule => rule.ruleId === item.ruleId)),
       }))
     : [];
+  const activeSampleMeta = samples.find(sample => sample.url === activeSample);
+  const inputLabel = activeSample === 'uploaded' ? 'Uploaded CSV' : (activeSampleMeta?.label ?? 'CSV input');
+  const judgeRoute = [
+    { step: '1', label: 'Sample', detail: '샘플 또는 CSV 선택' },
+    { step: '2', label: 'KPI', detail: '핵심 지표 확인' },
+    { step: '3', label: 'Proof', detail: 'trace matched 확인' },
+    { step: '4', label: 'Skills', detail: '규칙 원문 열기' },
+    { step: '5', label: 'Fallback', detail: '미지원 CSV 진단' },
+  ];
+  const inputDecisionEvidence = analysis
+    ? [
+        {
+          label: 'Input',
+          value: inputLabel,
+          detail: `${rows.length.toLocaleString()} rows · ${Object.keys(rows[0] ?? {}).length} cols`,
+        },
+        {
+          label: 'Decision',
+          value: detectionLabel(analysis.detection.dataType),
+          detail: `${confidence}% confidence · ${analysis.trace[0]?.ruleId ?? 'detecting'}`,
+        },
+        {
+          label: 'Evidence',
+          value: analysis.detection.reasons[0] ?? 'Skills rule applied',
+          detail: analysis.detection.reasons.slice(1).join(' · ') || 'Detection rule matched through Skills.md contract',
+        },
+      ]
+    : [];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -545,6 +573,22 @@ export default function App() {
               {isRunning ? '분석 중…' : 'Analyze'}
             </Button>
           </div>
+
+          <div className="rounded-lg border bg-muted/20 p-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="px-2 font-medium text-muted-foreground">Judge route</span>
+              {judgeRoute.map((item, index) => (
+                <div key={item.step} className="flex items-center gap-2">
+                  <span className="rounded-md border bg-background px-2.5 py-1">
+                    <span className="font-mono text-[10px] text-muted-foreground">{item.step}</span>{' '}
+                    <span className="font-medium">{item.label}</span>
+                    <span className="hidden text-muted-foreground sm:inline"> · {item.detail}</span>
+                  </span>
+                  {index < judgeRoute.length - 1 && <span className="font-mono text-muted-foreground">→</span>}
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
 
         {showDiagnostic && (
@@ -572,6 +616,20 @@ export default function App() {
 
         {analysis && (
           <>
+            <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {inputDecisionEvidence.map(item => (
+                <Card key={item.label} className="bg-card/70 shadow-none">
+                  <CardHeader className="gap-2 pb-3">
+                    <CardDescription>{item.label}</CardDescription>
+                    <CardTitle className="text-base leading-tight">{item.value}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-xs leading-relaxed text-muted-foreground">{item.detail}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </section>
+
             <section className="grid grid-cols-1 gap-3 lg:grid-cols-4">
               {primaryKpis.map((k, idx) => (
                 <Card
