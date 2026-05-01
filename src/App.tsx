@@ -459,6 +459,13 @@ export default function App() {
         { label: 'Dashboard', value: 'Generated', detail: 'KPI · chart · insight · trace' },
       ]
     : [];
+  const proofFlow = ['CSV input', 'Skills pipeline', 'Trace matched', 'Dashboard generated'];
+  const traceSnapshot = analysis
+    ? analysis.trace.map(item => ({
+        ...item,
+        matched: Boolean(contract?.matched.some(rule => rule.ruleId === item.ruleId)),
+      }))
+    : [];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -603,14 +610,60 @@ export default function App() {
               ))}
             </section>
 
-            <section className="grid grid-cols-1 gap-3 rounded-xl border bg-muted/25 p-3 md:grid-cols-4">
-              {proofStats.map(stat => (
-                <div key={stat.label} className="flex flex-col gap-1 rounded-lg border bg-background p-3">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{stat.label}</span>
-                  <strong className="text-sm tabular-nums">{stat.value}</strong>
-                  <span className="text-[11px] text-muted-foreground">{stat.detail}</span>
-                </div>
-              ))}
+            <section className="grid grid-cols-1 gap-3 rounded-xl border bg-muted/25 p-3 lg:grid-cols-[1.05fr_0.95fr]">
+              <Card className="bg-background shadow-none">
+                <CardHeader className="pb-3">
+                  <CardDescription>Proof flow</CardDescription>
+                  <CardTitle className="text-base">CSV가 Skills.md contract를 지나 화면으로 바뀐 경로</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+                    {proofStats.map(stat => (
+                      <div key={stat.label} className="flex flex-col gap-1 rounded-lg border bg-card p-3">
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{stat.label}</span>
+                        <strong className="text-sm tabular-nums">{stat.value}</strong>
+                        <span className="text-[11px] text-muted-foreground">{stat.detail}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {proofFlow.map((step, index) => (
+                      <div key={step} className="flex items-center gap-2">
+                        <span className="rounded-md border bg-background px-2 py-1 font-medium text-foreground">{step}</span>
+                        {index < proofFlow.length - 1 && <span className="font-mono">→</span>}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-background shadow-none">
+                <CardHeader className="pb-3">
+                  <CardDescription>Current trace snapshot</CardDescription>
+                  <CardTitle className="text-base">현재 분석에 실제 적용된 5개 rule</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2">
+                  {traceSnapshot.map(item => (
+                    <button
+                      key={`snapshot-${item.step}-${item.ruleId}`}
+                      type="button"
+                      onClick={() => openSkill(item.skillId as SkillId)}
+                      className="flex w-full items-center gap-2 rounded-lg border bg-card p-2 text-left transition-colors hover:bg-muted/50"
+                    >
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-[11px] font-semibold">
+                        {item.step}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-mono text-[11px]">{item.ruleId}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground">{item.output}</span>
+                      </span>
+                      <Badge variant={item.matched ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
+                        {item.matched ? 'matched' : 'review'}
+                      </Badge>
+                    </button>
+                  ))}
+                </CardContent>
+              </Card>
             </section>
 
             {secondaryKpis.length > 0 && (

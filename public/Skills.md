@@ -2,6 +2,16 @@
 
 이 문서는 **InvestSkill Lens가 임의의 투자 CSV를 자동으로 분석·시각화·요약하기 위해 따르는 규칙 전체**의 인덱스이자 최상위 contract이다. 각 단계의 상세 규칙은 `skills/*.md` 5개 문서로 분리되어 있으며, 본 문서는 단계 간 연결과 전역 원칙을 정의한다.
 
+## 10초 요약
+
+| 질문 | 답 |
+| --- | --- |
+| 이 문서는 무엇인가? | CSV 분석 대시보드를 생성하는 5단계 Skills contract |
+| 입력은 무엇인가? | 임의 투자 CSV 또는 제공 샘플 CSV |
+| 출력은 무엇인가? | KPI, chart, risk visual, insight, generated report summary, trace |
+| 검증은 어떻게 하나? | 화면 trace rule id와 Skills rule id가 `matched`인지 확인 |
+| 안전장치는 무엇인가? | 투자 추천·수익 보장 금지 Safety Charter와 항상 표시되는 disclaimer |
+
 대회 명세에 따라 본 문서는 다음 다섯 역할을 모두 수행하도록 설계되었다.
 
 1. 투자 데이터 분석 기준 정의
